@@ -1,80 +1,94 @@
 using UnityEngine;
 using UnityEngine.UI;
-// Si usas TextMeshPro, descomenta la siguiente línea:
-// using TMPro; 
+using UnityEngine.EventSystems; // IMPORTANTE: Necesario para arrastrar
 
-public class CardDisplay : MonoBehaviour
+// Agregamos las interfaces de Drag
+public class CardDisplay : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
     [Header("Referencias UI")]
-    public Image iconImage;       // La imagen de la tropa
-    public Text costText;         // El texto del costo (usar Text o TMP_Text)
-    public Image backgroundImage; // El fondo de la carta (para cambiar color si no hay maná)
-    
-    [Header("Datos (Se llenan por código)")]
-    public CardData cardData;     // La data que esta carta está mostrando actualmente
+    public Image iconImage;
+    public Text costText;
+    public Image backgroundImage;
 
-    // Referencia al botón para saber si fue clicado (opcional, para selección)
-    private Button btn;
+    [Header("Datos")]
+    public CardData cardData;
+
+    private CanvasGroup canvasGroup; // Para que el rayo atraviese la carta al arrastrar
+    private Vector3 originalPosition; // Para volver si no se juega
+    private Transform originalParent;
 
     private void Awake()
     {
-        btn = GetComponent<Button>();
+        // El CanvasGroup nos ayuda a controlar si la carta bloquea el mouse o no
+        canvasGroup = GetComponent<CanvasGroup>();
+        if (canvasGroup == null) canvasGroup = gameObject.AddComponent<CanvasGroup>();
     }
 
-    // --- SETUP INICIAL ---
-    // Este método lo llamará el DeckManager para "inyectar" los datos
     public void Setup(CardData data)
     {
         cardData = data;
-
-        // Asignamos visuales
         if (cardData != null)
         {
-            iconImage.sprite = cardData.icono;
-            costText.text = cardData.costoMana.ToString();
-            gameObject.name = "UI_" + cardData.nombreCarta; // Para orden en la jerarquía
+            iconImage.sprite = data.icono;
+            costText.text = data.costoMana.ToString();
+            gameObject.name = "UI_" + data.nombreCarta;
         }
     }
 
-    // --- BUCLE DEL JUEGO ---
     private void Update()
     {
         if (cardData == null || ManaManager.Instance == null) return;
 
-        // Criterio QA Visual: Feedback al usuario sobre el maná
-        // Consultamos a tu ManaManager si tenemos suficiente recurso
-        bool canAfford = ManaManager.Instance.HasEnoughMana(cardData.costoMana);
+        // Feedback visual de si alcanza el maná
+        bool canAfford = ManaManager.Instance.currentMana >= cardData.costoMana;
 
-        if (canAfford)
+        // Si la estamos arrastrando, no cambiamos el color
+        if (canvasGroup.blocksRaycasts)
         {
-            // Estado: DISPONIBLE (Color normal)
-            iconImage.color = Color.white;
-            backgroundImage.color = Color.white;
-        }
-        else
-        {
-            // Estado: NO DISPONIBLE (Oscurecido/Gris)
-            iconImage.color = new Color(0.5f, 0.5f, 0.5f, 1f); // Gris oscuro
-            backgroundImage.color = Color.gray;
+            iconImage.color = canAfford ? Color.white : Color.gray;
         }
     }
 
-    // Este método se conectará al evento OnClick del botón en el Inspector
-    public void OnClickCard()
-    {
-        if (cardData == null) return;
+    // --- INTERFACES DE ARRASTRE ---
 
-        // Aquí validamos si podemos seleccionarla
-        if (ManaManager.Instance.HasEnoughMana(cardData.costoMana))
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        // Validar Maná antes de dejar arrastrar
+        if (!ManaManager.Instance.HasEnoughMana(cardData.costoMana))
         {
-            Debug.Log($"Carta seleccionada: {cardData.nombreCarta}. Esperando posición...");
-            
-            // AQUÍ IRÁ LA LÓGICA DEL SIGUIENTE ISSUE:
-            // DeckManager.Instance.SetSelectedCard(this);
+            Debug.Log("No tienes maná suficiente.");
+            eventData.pointerDrag = null; // Cancelar arrastre
+            return;
         }
-        else
+
+        originalPosition = transform.position;
+        originalParent = transform.parent;
+
+        // Sacar la carta del layout para que flote libre
+        transform.SetParent(transform.root);
+        canvasGroup.blocksRaycasts = false; // Permitir que el rayo atraviese la carta y toque el suelo 3D
+
+        // Avisar al controlador
+        CardPlayController.Instance.StartDrag(cardData, this);
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        transform.position = Input.mousePosition; // La carta sigue al mouse
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        canvasGroup.blocksRaycasts = true;
+
+        // Avisar al controlador que soltamos
+        CardPlayController.Instance.EndDrag();
+
+        // Si la carta no fue destruida (porque no se jugó), volver a la mano
+        if (this != null && gameObject != null)
         {
-            Debug.Log("No tienes suficiente maná para seleccionar esta carta.");
+            transform.SetParent(originalParent);
+            transform.position = originalPosition;
         }
     }
 }

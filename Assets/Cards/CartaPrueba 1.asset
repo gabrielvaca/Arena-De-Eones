@@ -15,5 +15,5 @@ MonoBehaviour:
   nombreCarta: Test1
   icono: {fileID: 21300000, guid: c8f8fe1d78170e84eab15e7562604fdc, type: 3}
   descripcion: 
-  costoMana: 6
+  costoMana: 3
   prefabUnidad: {fileID: 0}
