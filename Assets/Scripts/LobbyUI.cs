@@ -17,9 +17,22 @@ public class LobbyUI : MonoBehaviour
         btnCrear.onClick.AddListener(CrearPartida);
         btnUnirse.onClick.AddListener(UnirsePartida);
 
+        if (RelayManager.Instance != null)
+        {
+            RelayManager.Instance.OnMatchmakingComplete += OcultarMenu;
+        }
+
         // Ocultamos el texto del código al inicio
         textoCodigoDisplay.text = "Generando código...";
         textoCodigoDisplay.gameObject.SetActive(false);
+    }
+
+    void OnDestroy()
+    {
+        if (RelayManager.Instance != null)
+        {
+            RelayManager.Instance.OnMatchmakingComplete -= OcultarMenu;
+        }
     }
 
     void CrearPartida()
@@ -52,9 +65,6 @@ public class LobbyUI : MonoBehaviour
         textoCodigoDisplay.gameObject.SetActive(true);
 
         RelayManager.Instance.JoinRelay(codigo);
-
-        // Opcional: Ocultar el menú después de unos segundos
-        Invoke(nameof(OcultarMenu), 2f);
     }
 
     void ActualizarCodigoEnPantalla()
@@ -71,6 +81,14 @@ public class LobbyUI : MonoBehaviour
 
     void OcultarMenu()
     {
-        panelMenu.SetActive(false);
+        if (panelMenu != null)
+        {
+            panelMenu.SetActive(false);
+            AudioSource audio = panelMenu.GetComponent<AudioSource>();
+            if (audio != null && audio.isPlaying)
+            {
+                audio.Stop();
+            }
+        }
     }
 }
