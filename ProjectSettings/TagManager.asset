@@ -9,11 +9,13 @@ TagManager:
   - Strcucture
   - ZoneP1
   - ZoneP2
+  - TorreP1
+  - TorreP2
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - Unit
   - Water
   - UI
   - Troop
