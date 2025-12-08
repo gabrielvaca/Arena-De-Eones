@@ -1,15 +1,18 @@
 using UnityEngine;
 
-// Esto a�ade una opci�n en el men� de Unity para crear cartas nuevas f�cilmente
 [CreateAssetMenu(fileName = "NuevaCarta", menuName = "Arena/Carta")]
 public class CardData : ScriptableObject
 {
-    [Header("Informaci�n B�sica")]
+    [Header("Información Básica")]
     public string nombreCarta;
-    public Sprite icono; // La imagen para la UI
+    public Sprite icono;
     [TextArea] public string descripcion;
 
     [Header("Juego")]
     public int costoMana;
-    public GameObject prefabUnidad; // El modelo 3D que aparecerá en la arena
+    public GameObject prefabUnidad;
+
+    [Header("Multijugador")]
+    // NUEVO: Este número debe coincidir con la posición en la lista del CardPlayController
+    public int unitId;
 }
