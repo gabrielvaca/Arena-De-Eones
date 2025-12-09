@@ -7,7 +7,7 @@ public class Projectile : MonoBehaviour
 
     private Transform _target;
     private int _damage;
-    
+
     public void Initialize(Transform newTarget, int damage)
     {
         _target = newTarget;
@@ -47,12 +47,6 @@ public class Projectile : MonoBehaviour
 
     private void HitTarget()
     {
-        Health targetHealth = _target.GetComponent<Health>();
-        if (targetHealth != null)
-        {
-            targetHealth.TakeDamage(_damage);
-        }
-
         Destroy(gameObject);
     }
 }
