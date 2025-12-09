@@ -31,7 +31,7 @@ public class Tower : NetworkBehaviour
 
     void Update()
     {
-        if (!IsServer) return; // Solo servidor calcula lógica
+        if (!IsServer) return;
 
         if (_health != null && !_health.IsAlive) return;
 
@@ -39,7 +39,6 @@ public class Tower : NetworkBehaviour
 
         if (_currentTarget == null) return;
 
-        // NOTA: La rotación (_entityVisual) también solo se ve en el servidor con este código.
         if (_entityVisual)
         {
             _entityVisual.AimAt(_currentTarget.position);
@@ -60,6 +59,7 @@ public class Tower : NetworkBehaviour
             else return;
         }
 
+        // NOTA: La Tropa ya tiene el Collider, por eso esta detección funciona.
         Collider[] hits = Physics.OverlapSphere(transform.position, range, targetLayer);
         Transform best = null;
         float bestDist = Mathf.Infinity;
@@ -88,11 +88,9 @@ public class Tower : NetworkBehaviour
 
         if (projectilePrefab == null || firePoint == null || _currentTarget == null) return;
 
-        // CAMBIO IMPORTANTE: Usamos RPC para que todos vean la animación
         PlayAttackAnimationClientRpc();
     }
 
-    // El servidor grita: "¡Animación!" y todos obedecen
     [ClientRpc]
     private void PlayAttackAnimationClientRpc()
     {
@@ -102,7 +100,6 @@ public class Tower : NetworkBehaviour
         }
 
         // Llamada ClientRpc para instanciar el proyectil visual
-        // Esto asegura que Host y Cliente vean el disparo, aunque solo el Servidor aplica el daño.
         SpawnVisualProjectileClientRpc(firePoint.position, firePoint.rotation, _currentTarget.GetComponent<NetworkObject>().NetworkObjectId);
     }
 
@@ -115,26 +112,22 @@ public class Tower : NetworkBehaviour
 
         GameObject projObj = Instantiate(projectilePrefab, position, rotation);
 
-        // Nota: Projectile.cs debe ser modificado para usar SetTarget si es necesario
         Projectile projectile = projObj.GetComponent<Projectile>();
         if (projectile != null) projectile.SetTarget(targetNetObj.transform);
     }
 
-    public void ApplyDamageToTarget() // Reemplaza SpawnProjectile
+    public void ApplyDamageToTarget() // Llamado desde AnimationEventRelay
     {
-        if (!IsServer) return; // Solo servidor causa daño
+        if (!IsServer) return;
 
         if (_currentTarget == null) return;
 
-        // 1. APLICAR DAÑO SINCRONIZADO (El daño real ocurre aquí)
         Health targetHealth = _currentTarget.GetComponent<Health>();
 
         if (targetHealth != null && targetHealth.IsAlive)
         {
             targetHealth.RequestTakeDamageServerRpc(damage);
         }
-
-        // Nota: La instanciación visual fue movida al RPC para que el cliente la vea.
     }
 
     private void OnTowerDeath()
