@@ -21,14 +21,14 @@ public class Health : NetworkBehaviour
     public UnityEvent OnDamaged;
     public UnityEvent OnDied;
 
-    private TowerVisual _towerVisual;
+    private EntityVisual _entityVisual;
     private int _maxHealthCache;
 
     public bool IsAlive => CurrentHealth.Value > 0;
 
     void Awake()
     {
-        _towerVisual = GetComponent<TowerVisual>();
+        _entityVisual = GetComponent<EntityVisual>();
         _maxHealthCache = maxHealth;
     }
 
@@ -39,8 +39,8 @@ public class Health : NetworkBehaviour
             CurrentHealth.Value = _maxHealthCache;
         }
 
-        _towerVisual?.SetMaxHealth(_maxHealthCache);
-        _towerVisual?.UpdateHealthBar(CurrentHealth.Value, _maxHealthCache);
+        _entityVisual?.SetMaxHealth(_maxHealthCache);
+        _entityVisual?.UpdateHealthBar(CurrentHealth.Value, _maxHealthCache);
 
         CurrentHealth.OnValueChanged += OnHealthChanged;
 
@@ -58,7 +58,6 @@ public class Health : NetworkBehaviour
     {
         if (!IsServer || CurrentHealth.Value <= 0) return;
 
-        // Tarea: Verificar que la torre haga realmente daño a la tropa con console log
         Debug.Log($"[SERVER] {gameObject.name} recibió {damageAmount} de daño. HP restante: {CurrentHealth.Value - damageAmount}");
 
         CurrentHealth.Value = Mathf.Max(0, CurrentHealth.Value - damageAmount);
@@ -66,7 +65,7 @@ public class Health : NetworkBehaviour
 
     private void OnHealthChanged(int oldHealth, int newHealth)
     {
-        _towerVisual?.UpdateHealthBar(newHealth, _maxHealthCache);
+        _entityVisual?.UpdateHealthBar(newHealth, _maxHealthCache);
 
         if (newHealth < oldHealth)
         {

@@ -17,7 +17,7 @@ public class Tower : NetworkBehaviour
     [SerializeField] private int damage = 10;
     [SerializeField] private Animator animator;
 
-    private TowerVisual _towerVisual;
+    private EntityVisual _entityVisual;
     private float _fireCooldown;
     private Transform _currentTarget;
     private Health _health;
@@ -26,7 +26,7 @@ public class Tower : NetworkBehaviour
     {
         this._health = GetComponent<Health>();
         if (_health != null) _health.OnDied.AddListener(OnTowerDeath);
-        _towerVisual = GetComponent<TowerVisual>();
+        _entityVisual = GetComponent<EntityVisual>();
     }
 
     void Update()
@@ -39,11 +39,10 @@ public class Tower : NetworkBehaviour
 
         if (_currentTarget == null) return;
 
-        // NOTA: La rotación (_towerVisual) también solo se ve en el servidor con este código.
-        // Si quieres que el cliente vea rotar la torre, necesitarías un NetworkTransform en la parte que gira.
-        if (_towerVisual)
+        // NOTA: La rotación (_entityVisual) también solo se ve en el servidor con este código.
+        if (_entityVisual)
         {
-            _towerVisual.AimAt(_currentTarget.position);
+            _entityVisual.AimAt(_currentTarget.position);
         }
 
         HandleShooting();
