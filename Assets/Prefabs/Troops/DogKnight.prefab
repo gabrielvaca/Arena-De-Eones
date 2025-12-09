@@ -1916,11 +1916,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ced2161a183034340bdf461542a710c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackRange: 1.5
-  fireRate: 1
-  damage: 10
-  projectilePrefab: {fileID: 0}
-  firePoint: {fileID: 0}
 --- !u!114 &7005754230901157160
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1933,6 +1928,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fedb6f48d691aba42ba4f6c302e7a764, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  AttackRange: 1.5
+  FireRate: 1
+  Damage: 10
+  ProjectilePrefab: {fileID: 0}
+  FirePoint: {fileID: 0}
+  DetectionRange: 10
+  StoppingDistanceMultiplier: 0.9
+  TargetLayers:
+    serializedVersion: 2
+    m_Bits: 8
+  IsStationary: 0
   teamID: 0
 --- !u!114 &5593665687545758862
 MonoBehaviour:

@@ -1,19 +1,25 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.Netcode;
+using System.Linq;
 
 public class UnitAI : NetworkBehaviour
 {
+    private Unit _unitData;
     private NavMeshAgent agent;
     private Animator animator;
     private string tagObjetivo;
 
-    [SerializeField] private float attackRange = 1.5f;
-    [SerializeField] private float fireRate = 1f;
-    [SerializeField] private int damage = 10;
+    private bool _isStationary;
 
-    [SerializeField] private GameObject projectilePrefab;
-    [SerializeField] private Transform firePoint;
+    private float _attackRange;
+    private float _fireRate;
+    private int _damage;
+    private GameObject _projectilePrefab;
+    private Transform _firePoint;
+    private LayerMask _targetLayers;
+    private float _detectionRange;
+    private const float TOWER_ATTACK_RANGE = 4.0f;
 
     private float _fireCooldown;
     private Transform _currentTarget;
@@ -21,13 +27,37 @@ public class UnitAI : NetworkBehaviour
     private void Awake()
     {
         animator = GetComponent<Animator>();
+        _unitData = GetComponent<Unit>();
+        agent = GetComponent<NavMeshAgent>();
+
+        if (_unitData != null)
+        {
+            _attackRange = _unitData.AttackRange;
+            _fireRate = _unitData.FireRate;
+            _damage = _unitData.Damage;
+            _projectilePrefab = _unitData.ProjectilePrefab;
+            _firePoint = _unitData.FirePoint;
+            _targetLayers = _unitData.TargetLayers;
+            _detectionRange = _unitData.DetectionRange;
+
+            _isStationary = _unitData.IsStationary;
+
+            if (agent != null)
+            {
+                agent.stoppingDistance = _attackRange * _unitData.StoppingDistanceMultiplier;
+            }
+
+            if (_isStationary && agent != null)
+            {
+                Destroy(agent);
+                agent = null;
+            }
+        }
     }
 
     public override void OnNetworkSpawn()
     {
         if (!IsServer) return;
-
-        agent = GetComponent<NavMeshAgent>();
 
         if (OwnerClientId == 0)
         {
@@ -37,8 +67,6 @@ public class UnitAI : NetworkBehaviour
         {
             tagObjetivo = "TorreP1";
         }
-
-        IrATorreMasCercana();
     }
 
     void Update()
@@ -49,12 +77,40 @@ public class UnitAI : NetworkBehaviour
 
         if (_currentTarget != null)
         {
-            if (agent != null && agent.isActiveAndEnabled) agent.isStopped = true;
+            float distToTarget = Vector3.Distance(transform.position, _currentTarget.position);
 
-            HandleShooting();
+            float effectiveAttackRange = _attackRange;
+            if (_currentTarget.GetComponent<Tower>() != null)
+            {
+                effectiveAttackRange = TOWER_ATTACK_RANGE;
+            }
+
+            if (distToTarget <= effectiveAttackRange)
+            {
+                if (!_isStationary && agent != null && agent.isActiveAndEnabled) agent.isStopped = true;
+
+                Vector3 lookPos = _currentTarget.position - transform.position;
+                lookPos.y = 0;
+                Quaternion rotation = Quaternion.LookRotation(lookPos);
+                transform.rotation = Quaternion.Slerp(transform.rotation, rotation, Time.deltaTime * 5f);
+
+                HandleShooting();
+            }
+            else
+            {
+                if (_isStationary) return;
+
+                if (agent != null && agent.isActiveAndEnabled && agent.isStopped)
+                {
+                    agent.isStopped = false;
+                }
+                agent.SetDestination(_currentTarget.position);
+            }
         }
         else
         {
+            if (_isStationary) return;
+
             if (agent != null && agent.isActiveAndEnabled && agent.isStopped)
             {
                 agent.isStopped = false;
@@ -68,14 +124,19 @@ public class UnitAI : NetworkBehaviour
         if (_currentTarget != null)
         {
             float dist = Vector3.Distance(transform.position, _currentTarget.position);
-            if (dist > attackRange || _currentTarget.GetComponent<Health>()?.IsAlive == false)
+
+            if (_currentTarget.GetComponent<Health>()?.IsAlive == false || dist > _detectionRange)
             {
                 _currentTarget = null;
             }
-            else return;
+            else
+            {
+                return;
+            }
         }
 
-        Collider[] hits = Physics.OverlapSphere(transform.position, attackRange);
+        LayerMask targetMask = _targetLayers;
+        Collider[] hits = Physics.OverlapSphere(transform.position, _detectionRange, targetMask);
 
         Transform best = null;
         float bestDist = Mathf.Infinity;
@@ -102,7 +163,12 @@ public class UnitAI : NetworkBehaviour
                 }
             }
         }
-        _currentTarget = best;
+
+        if (best != null)
+        {
+            _currentTarget = best;
+            return;
+        }
     }
 
     private void HandleShooting()
@@ -110,7 +176,7 @@ public class UnitAI : NetworkBehaviour
         _fireCooldown -= Time.deltaTime;
         if (_fireCooldown > 0f) return;
 
-        _fireCooldown = 1f / fireRate;
+        _fireCooldown = 1f / _fireRate;
 
         if (_currentTarget == null) return;
 
@@ -123,7 +189,7 @@ public class UnitAI : NetworkBehaviour
         Health targetHealth = _currentTarget.GetComponent<Health>();
         if (targetHealth != null)
         {
-            targetHealth.RequestTakeDamageServerRpc(damage);
+            targetHealth.RequestTakeDamageServerRpc(_damage);
         }
     }
 
@@ -135,20 +201,20 @@ public class UnitAI : NetworkBehaviour
             animator.SetTrigger("Attack");
         }
 
-        if (projectilePrefab != null && firePoint != null && _currentTarget != null)
+        if (_projectilePrefab != null && _firePoint != null && _currentTarget != null)
         {
-            SpawnVisualProjectileClientRpc(firePoint.position, firePoint.rotation, _currentTarget.GetComponent<NetworkObject>().NetworkObjectId);
+            SpawnVisualProjectileClientRpc(_firePoint.position, _firePoint.rotation, _currentTarget.GetComponent<NetworkObject>().NetworkObjectId);
         }
     }
 
     [ClientRpc]
     private void SpawnVisualProjectileClientRpc(Vector3 position, Quaternion rotation, ulong targetNetId)
     {
-        if (projectilePrefab == null || NetworkManager.Singleton == null || !NetworkManager.Singleton.SpawnManager.SpawnedObjects.ContainsKey(targetNetId)) return;
+        if (_projectilePrefab == null || NetworkManager.Singleton == null || !NetworkManager.Singleton.SpawnManager.SpawnedObjects.ContainsKey(targetNetId)) return;
 
         NetworkObject targetNetObj = NetworkManager.Singleton.SpawnManager.SpawnedObjects[targetNetId];
 
-        GameObject projObj = Instantiate(projectilePrefab, position, rotation);
+        GameObject projObj = Instantiate(_projectilePrefab, position, rotation);
 
         Projectile projectile = projObj.GetComponent<Projectile>();
         if (projectile != null) projectile.SetTarget(targetNetObj.transform);
@@ -175,6 +241,25 @@ public class UnitAI : NetworkBehaviour
         if (masCercano != null)
         {
             agent.SetDestination(masCercano.transform.position);
+            _currentTarget = masCercano.transform;
         }
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (_unitData == null)
+        {
+            _unitData = GetComponent<Unit>();
+            if (_unitData == null) return;
+        }
+
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireSphere(transform.position, _unitData.DetectionRange);
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, _unitData.AttackRange);
+
+        Gizmos.color = Color.magenta;
+        Gizmos.DrawWireSphere(transform.position, TOWER_ATTACK_RANGE);
     }
 }
