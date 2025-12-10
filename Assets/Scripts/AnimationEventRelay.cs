@@ -2,16 +2,17 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using Unity.Netcode;
 
 public class AnimationEventRelay : MonoBehaviour
 {
-    
+
     private Tower _tower;
 
     private void Awake()
     {
         _tower = GetComponentInParent<Tower>();
-        
+
         if (_tower == null)
         {
             Debug.LogError("Tower script no encontrado en el padre.");
@@ -22,7 +23,7 @@ public class AnimationEventRelay : MonoBehaviour
     {
         if (_tower != null)
         {
-            _tower.SpawnProjectile();
+            _tower.ApplyDamageToTarget();
         }
     }
 }

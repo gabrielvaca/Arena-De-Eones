@@ -3,19 +3,29 @@ using Unity.Netcode;
 
 public class Unit : NetworkBehaviour
 {
-    // Esta variable nos dirá de qué equipo es
+    [Header("Combat Stats")]
+    [SerializeField] public float AttackRange = 1.5f;
+    [SerializeField] public float FireRate = 1f;
+    [SerializeField] public int Damage = 10;
+    [SerializeField] public GameObject ProjectilePrefab;
+    [SerializeField] public Transform FirePoint;
+
+    [Header("Strategy & Targeting")]
+    [SerializeField] public float DetectionRange = 5f;
+    [SerializeField] public float StoppingDistanceMultiplier = 0.9f;
+    [SerializeField] public LayerMask TargetLayers;
+
+    [Header("Movement Control")]
+    [SerializeField] public bool IsStationary = false;
+
+    [Header("Identity")]
     public int teamID;
 
     public override void OnNetworkSpawn()
     {
-        // TRUCO MAESTRO:
-        // En Netcode, cada jugador tiene una ID única (0, 1, 2...).
-        // Usamos esa ID directamente como su equipo.
-        // OwnerClientId ya viene sincronizado por Unity.
         teamID = (int)OwnerClientId;
 
-        // Opcional: Cambiar color para debug visual
-        if (teamID == 0) GetComponentInChildren<Renderer>().material.color = Color.red; // Host
-        else GetComponentInChildren<Renderer>().material.color = Color.blue; // Cliente
+        if (teamID == 0) GetComponentInChildren<Renderer>().material.color = Color.red;
+        else GetComponentInChildren<Renderer>().material.color = Color.blue;
     }
 }

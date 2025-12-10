@@ -17,7 +17,7 @@ public class Tower : NetworkBehaviour
     [SerializeField] private int damage = 10;
     [SerializeField] private Animator animator;
 
-    private TowerVisual _towerVisual;
+    private EntityVisual _entityVisual;
     private float _fireCooldown;
     private Transform _currentTarget;
     private Health _health;
@@ -26,12 +26,12 @@ public class Tower : NetworkBehaviour
     {
         this._health = GetComponent<Health>();
         if (_health != null) _health.OnDied.AddListener(OnTowerDeath);
-        _towerVisual = GetComponent<TowerVisual>();
+        _entityVisual = GetComponent<EntityVisual>();
     }
 
     void Update()
     {
-        if (!IsServer) return; // Solo servidor calcula lógica
+        if (!IsServer) return;
 
         if (_health != null && !_health.IsAlive) return;
 
@@ -39,11 +39,9 @@ public class Tower : NetworkBehaviour
 
         if (_currentTarget == null) return;
 
-        // NOTA: La rotación (_towerVisual) también solo se ve en el servidor con este código.
-        // Si quieres que el cliente vea rotar la torre, necesitarías un NetworkTransform en la parte que gira.
-        if (_towerVisual)
+        if (_entityVisual)
         {
-            _towerVisual.AimAt(_currentTarget.position);
+            _entityVisual.AimAt(_currentTarget.position);
         }
 
         HandleShooting();
@@ -61,6 +59,7 @@ public class Tower : NetworkBehaviour
             else return;
         }
 
+        // NOTA: La Tropa ya tiene el Collider, por eso esta detección funciona.
         Collider[] hits = Physics.OverlapSphere(transform.position, range, targetLayer);
         Transform best = null;
         float bestDist = Mathf.Infinity;
@@ -89,11 +88,9 @@ public class Tower : NetworkBehaviour
 
         if (projectilePrefab == null || firePoint == null || _currentTarget == null) return;
 
-        // CAMBIO IMPORTANTE: Usamos RPC para que todos vean la animación
         PlayAttackAnimationClientRpc();
     }
 
-    // El servidor grita: "¡Animación!" y todos obedecen
     [ClientRpc]
     private void PlayAttackAnimationClientRpc()
     {
@@ -101,31 +98,43 @@ public class Tower : NetworkBehaviour
         {
             animator.SetTrigger("CastSpell");
         }
+
+        // Llamada ClientRpc para instanciar el proyectil visual
+        SpawnVisualProjectileClientRpc(firePoint.position, firePoint.rotation, _currentTarget.GetComponent<NetworkObject>().NetworkObjectId);
     }
 
-    // Esta función la llama el Evento de la Animación (si lo usas)
-    // O puedes llamarla directo en HandleShooting si quitas la animación
-    public void SpawnProjectile()
+    [ClientRpc]
+    private void SpawnVisualProjectileClientRpc(Vector3 position, Quaternion rotation, ulong targetNetId)
     {
-        if (!IsServer) return; // Solo servidor crea objetos
+        if (projectilePrefab == null || NetworkManager.Singleton == null || !NetworkManager.Singleton.SpawnManager.SpawnedObjects.ContainsKey(targetNetId)) return;
 
-        if (projectilePrefab == null || firePoint == null || _currentTarget == null) return;
+        NetworkObject targetNetObj = NetworkManager.Singleton.SpawnManager.SpawnedObjects[targetNetId];
 
-        GameObject projObj = Instantiate(projectilePrefab, firePoint.position, firePoint.rotation);
+        GameObject projObj = Instantiate(projectilePrefab, position, rotation);
 
         Projectile projectile = projObj.GetComponent<Projectile>();
-        if (projectile != null) projectile.Initialize(_currentTarget, damage);
+        if (projectile != null) projectile.SetTarget(targetNetObj.transform);
+    }
 
-        NetworkObject netObj = projObj.GetComponent<NetworkObject>();
-        if (netObj != null) netObj.Spawn();
+    public void ApplyDamageToTarget() // Llamado desde AnimationEventRelay
+    {
+        if (!IsServer) return;
+
+        if (_currentTarget == null) return;
+
+        Health targetHealth = _currentTarget.GetComponent<Health>();
+
+        if (targetHealth != null && targetHealth.IsAlive)
+        {
+            targetHealth.RequestTakeDamageServerRpc(damage);
+        }
     }
 
     private void OnTowerDeath()
     {
         if (IsServer)
         {
-            if (GetComponent<NetworkObject>() != null) GetComponent<NetworkObject>().Despawn();
-            else Destroy(gameObject);
+            // La destrucción la maneja Health.cs
         }
     }
 

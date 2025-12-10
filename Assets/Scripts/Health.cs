@@ -1,63 +1,98 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
+using Unity.Netcode;
+using UnityEngine.UI;
 
-public class Health : MonoBehaviour
+public class Health : NetworkBehaviour
 {
     [SerializeField]
     private int maxHealth = 100;
+
+    public readonly NetworkVariable<int> CurrentHealth = new NetworkVariable<int>(
+        1,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server
+    );
 
     [SerializeField]
     private bool destroyOnDeath = true;
 
     public UnityEvent OnDamaged;
-    public UnityEvent OnHealed;
     public UnityEvent OnDied;
 
-    public int CurrentHealth { get; private set; }
-    public bool IsAlive => CurrentHealth > 0;
+    private EntityVisual _entityVisual;
+    private int _maxHealthCache;
 
-    private bool invulnerable;
+    public bool IsAlive => CurrentHealth.Value > 0;
 
     void Awake()
     {
-        CurrentHealth = Mathf.Max(1, maxHealth);
+        _entityVisual = GetComponent<EntityVisual>();
+        _maxHealthCache = maxHealth;
     }
 
-    public void TakeDamage(int damage)
+    public override void OnNetworkSpawn()
     {
-        if (damage <= 0 || invulnerable || CurrentHealth <= 0) return;
+        if (IsServer)
+        {
+            CurrentHealth.Value = _maxHealthCache;
+        }
 
-        CurrentHealth = Mathf.Max(0, CurrentHealth - damage);
-        OnDamaged?.Invoke();
+        _entityVisual?.SetMaxHealth(_maxHealthCache);
+        _entityVisual?.UpdateHealthBar(CurrentHealth.Value, _maxHealthCache);
 
-        if (CurrentHealth == 0) Die();
+        CurrentHealth.OnValueChanged += OnHealthChanged;
+
+        base.OnNetworkSpawn();
     }
 
-    public void Heal(int amount)
+    public override void OnNetworkDespawn()
     {
-        if (amount <= 0 || CurrentHealth <= 0) return;
+        CurrentHealth.OnValueChanged -= OnHealthChanged;
+        base.OnNetworkDespawn();
+    }
 
-        CurrentHealth = Mathf.Min(maxHealth, CurrentHealth + amount);
-        OnHealed?.Invoke();
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestTakeDamageServerRpc(int damageAmount)
+    {
+        if (!IsServer || CurrentHealth.Value <= 0) return;
+
+        Debug.Log($"[SERVER] {gameObject.name} recibió {damageAmount} de daño. HP restante: {CurrentHealth.Value - damageAmount}");
+
+        CurrentHealth.Value = Mathf.Max(0, CurrentHealth.Value - damageAmount);
+    }
+
+    private void OnHealthChanged(int oldHealth, int newHealth)
+    {
+        _entityVisual?.UpdateHealthBar(newHealth, _maxHealthCache);
+
+        if (newHealth < oldHealth)
+        {
+            OnDamaged?.Invoke();
+        }
+
+        if (newHealth == 0)
+        {
+            Die();
+        }
     }
 
     private void Die()
     {
         OnDied?.Invoke();
-        if (destroyOnDeath) Destroy(gameObject);
-    }
 
-    public void SetInvulnerable(float seconds)
-    {
-        if (seconds <= 0) return;
-        StartCoroutine(InvulnerabilityRoutine(seconds));
-    }
-
-    private IEnumerator InvulnerabilityRoutine(float seconds)
-    {
-        invulnerable = true;
-        yield return new WaitForSeconds(seconds);
-        invulnerable = false;
+        if (IsServer && destroyOnDeath)
+        {
+            NetworkObject netObj = GetComponent<NetworkObject>();
+            if (netObj != null)
+            {
+                netObj.Despawn(destroy: true);
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
+        }
     }
 }
