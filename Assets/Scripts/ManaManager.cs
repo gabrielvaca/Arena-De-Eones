@@ -4,45 +4,52 @@ using UnityEngine;
 
 public class ManaManager : MonoBehaviour
 {
-    // Singleton para acceder fácil desde otros scripts (Issue #6)
     public static ManaManager Instance;
 
     [Header("Configuración")]
     public float maxMana = 10f;
     [Tooltip("1 punto cada 2 segundos = 0.5 por segundo")]
     public float manaRegenRate = 0.5f;
-    public float startingMana = 5f; // Según GDD [cite: 147] se inicia con 5
+    public float startingMana = 5f;
 
-    [Header("Estado Actual (Solo Lectura)")]
+    [Header("Estado Actual")]
     public float currentMana;
 
     private void Awake()
     {
-        // Configuración básica del Singleton
-        if (Instance == null)
-        {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
     private void Start()
     {
-        // Criterio QA: El maná empieza en un valor (5 según GDD)
+        // Iniciamos en 5
         currentMana = startingMana;
     }
 
     private void Update()
     {
-        // Criterio QA: Regeneración automática
+        // --- NUEVA LÓGICA DE ESPERA ---
+
+        // 1. Si no hay GameManager, no sabemos qué hacer, así que no regeneramos.
+        if (GameManager.Instance == null) return;
+
+        // 2. Si la partida NO ha empezado (estamos esperando al cliente)...
+        if (!GameManager.Instance.IsMatchActive)
+        {
+            // ... Mantenemos el maná congelado en el valor inicial (5)
+            // Esto evita que el Host se llene de maná mientras espera.
+            currentMana = startingMana;
+            return;
+        }
+
+        // ------------------------------
+
+        // 3. Si llegamos aquí, ¡La partida YA empezó! Regeneramos normal.
         if (currentMana < maxMana)
         {
             currentMana += manaRegenRate * Time.deltaTime;
 
-            // Criterio QA: Se detiene estrictamente al llegar a 10
             if (currentMana > maxMana)
             {
                 currentMana = maxMana;
@@ -50,30 +57,27 @@ public class ManaManager : MonoBehaviour
         }
     }
 
-    // --- MÉTODOS PÚBLICOS (API) ---
+    // --- MÉTODOS PÚBLICOS (Igual que antes) ---
 
-    // Método para consultar si tienes suficiente maná (útil para UI o validación)
     public bool HasEnoughMana(int cost)
     {
         return currentMana >= cost;
     }
 
-    // Criterio QA: Método público para consumir el recurso
     public bool TrySpendMana(int cost)
     {
         if (currentMana >= cost)
         {
             currentMana -= cost;
-            return true; // Compra exitosa
+            return true;
         }
         else
         {
             Debug.Log("¡No hay suficiente maná!");
-            return false; // Compra fallida
+            return false;
         }
     }
 
-    // Extra: Para obtener el valor entero para la UI (ej: mostrar "4" en vez de "4.56")
     public int GetIntegerMana()
     {
         return Mathf.FloorToInt(currentMana);
