@@ -18,7 +18,7 @@ public class SplashScreenManager : MonoBehaviour
     [SerializeField] private float zoomDuration = 2.0f;
     [SerializeField] private float targetScale = 1.2f;
 
-    private const string MainMenuSceneName = "ArenaScene";
+    private const string MainMenuSceneName = "MenuPrincipal";
 
     void Start()
     {
