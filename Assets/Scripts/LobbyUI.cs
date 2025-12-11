@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro; // Necesario para los textos modernos
+using TMPro;
 
 public class LobbyUI : MonoBehaviour
 {
@@ -8,55 +8,56 @@ public class LobbyUI : MonoBehaviour
     public Button btnCrear;
     public Button btnUnirse;
     public TMP_InputField inputCodigo;
-    public TMP_Text textoCodigoDisplay; // Donde mostraremos el código generado
-    public GameObject panelMenu; // Para ocultar el menú al empezar a jugar
+
+    [Header("Paneles y Textos")]
+    public GameObject panelBotones; // El panel que tiene los botones (se ocultará)
+    public TMP_Text textoCodigoDisplay; // El texto del código (debe quedarse visible)
 
     void Start()
     {
-        // Asignamos las funciones a los botones
+        // Asignamos funciones a los botones
         btnCrear.onClick.AddListener(CrearPartida);
         btnUnirse.onClick.AddListener(UnirsePartida);
 
+        // Nos suscribimos al evento del RelayManager
         if (RelayManager.Instance != null)
         {
-            RelayManager.Instance.OnMatchmakingComplete += OcultarMenu;
+            RelayManager.Instance.OnMatchmakingComplete += AlCompletarConexion;
         }
 
-        // Ocultamos el texto del código al inicio
-        textoCodigoDisplay.text = "Generando código...";
+        // Estado inicial
         textoCodigoDisplay.gameObject.SetActive(false);
+        if (panelBotones != null) panelBotones.SetActive(true);
     }
 
     void OnDestroy()
     {
+        // Limpieza de eventos para evitar errores
         if (RelayManager.Instance != null)
         {
-            RelayManager.Instance.OnMatchmakingComplete -= OcultarMenu;
+            RelayManager.Instance.OnMatchmakingComplete -= AlCompletarConexion;
         }
     }
 
+    // --- BOTÓN CREAR ---
     void CrearPartida()
     {
-        btnCrear.interactable = false; // Evitar doble clic
+        btnCrear.interactable = false;
         textoCodigoDisplay.gameObject.SetActive(true);
-        textoCodigoDisplay.text = "Creando sala...";
+        textoCodigoDisplay.text = "Generando código...";
 
-        // Llamamos al RelayManager
+        // Solo llamamos a crear. El resto pasa en 'AlCompletarConexion'
         RelayManager.Instance.CreateRelay();
-
-        // TRUCO: Como CreateRelay es asíncrono, vamos a checar cada segundo
-        // si ya tenemos código para mostrarlo en pantalla.
-        InvokeRepeating(nameof(ActualizarCodigoEnPantalla), 1f, 1f);
     }
 
+    // --- BOTÓN UNIRSE ---
     void UnirsePartida()
     {
         string codigo = inputCodigo.text;
 
-        // Validación simple
         if (string.IsNullOrEmpty(codigo) || codigo.Length < 6)
         {
-            Debug.Log("Código inválido, debe tener 6 caracteres");
+            Debug.Log("Código inválido");
             return;
         }
 
@@ -67,28 +68,21 @@ public class LobbyUI : MonoBehaviour
         RelayManager.Instance.JoinRelay(codigo);
     }
 
-    void ActualizarCodigoEnPantalla()
+    // --- ESTO SE EJECUTA CUANDO RELAYMANAGER TERMINA ---
+    void AlCompletarConexion()
     {
-        // Esta variable la vamos a agregar al RelayManager en un segundo
+        // 1. Mostrar el código si soy el Host (o si ya lo tengo)
         string codigo = RelayManager.Instance.joinCodeMostrable;
-
         if (!string.IsNullOrEmpty(codigo))
         {
             textoCodigoDisplay.text = "CÓDIGO DE SALA: " + codigo;
-            CancelInvoke(nameof(ActualizarCodigoEnPantalla)); // Dejamos de buscar
+            textoCodigoDisplay.gameObject.SetActive(true);
         }
-    }
 
-    void OcultarMenu()
-    {
-        if (panelMenu != null)
+        // 2. Ocultar los botones para que no molesten
+        if (panelBotones != null)
         {
-            panelMenu.SetActive(false);
-            AudioSource audio = panelMenu.GetComponent<AudioSource>();
-            if (audio != null && audio.isPlaying)
-            {
-                audio.Stop();
-            }
+            panelBotones.SetActive(false);
         }
     }
 }
