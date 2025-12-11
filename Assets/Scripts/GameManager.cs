@@ -10,9 +10,11 @@ public class GameManager : NetworkBehaviour
     [Header("Configuración")]
     [SerializeField] private float partidaDuracion = 90f; // 1:30 minutos
 
-    [Header("Referencias de Torres")]
+    [Header("Referencias de Torres (HOST / ROJO)")]
     public Health redKingTower;
     public List<Health> redPrincessTowers;
+
+    [Header("Referencias de Torres (CLIENTE / AZUL)")]
     public Health blueKingTower;
     public List<Health> bluePrincessTowers;
 
@@ -21,17 +23,13 @@ public class GameManager : NetworkBehaviour
     public GameObject winPanel;
     public TextMeshProUGUI winnerText;
 
-    // YA NO NECESITAMOS EL BOTÓN
-    // public Button startButton; 
-
     // Variables de Red
     private NetworkVariable<float> currentTimer = new NetworkVariable<float>(90f);
     private NetworkVariable<bool> isGameOver = new NetworkVariable<bool>(false);
     private NetworkVariable<bool> isMatchActive = new NetworkVariable<bool>(false);
-    // --- AGREGA ESTA LÍNEA ---
-    // Esto permite que otros scripts pregunten "¿Ya empezamos?"
+
+    // Propiedad pública para que el ManaManager sepa cuándo arrancar
     public bool IsMatchActive => isMatchActive.Value;
-    // --------------------------
 
     private void Awake()
     {
@@ -40,6 +38,7 @@ public class GameManager : NetworkBehaviour
 
     private void Start()
     {
+        // Aseguramos que el panel de victoria empiece oculto
         if (winPanel != null) winPanel.SetActive(false);
     }
 
@@ -49,31 +48,34 @@ public class GameManager : NetworkBehaviour
         {
             currentTimer.Value = partidaDuracion;
 
-            // SUSCRIBIRSE AL EVENTO DE CONEXIÓN
-            // Esto le dice al servidor: "Avísame cuando alguien se conecte"
+            // 1. Nos suscribimos por si alguien entra tarde (seguridad)
             NetworkManager.Singleton.OnClientConnectedCallback += CheckPlayersCount;
+
+            // 2. ¡EL ARREGLO! Chequeo INMEDIATO
+            // Si venimos del menú con Relay, los clientes ya están conectados al cargar la escena.
+            // Preguntamos: "¿Cuántos somos AHORA MISMO?"
+            if (NetworkManager.Singleton.ConnectedClients.Count >= 2)
+            {
+                StartMatch();
+            }
         }
     }
 
     public override void OnNetworkDespawn()
     {
-        // Limpieza: Nos desuscribimos para evitar errores al salir
+        // Limpieza para evitar errores al salir
         if (IsServer && NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= CheckPlayersCount;
         }
     }
 
-    // Esta función se ejecuta automáticamente cada vez que alguien entra
     private void CheckPlayersCount(ulong clientId)
     {
         if (!IsServer) return;
 
-        // Contamos cuántos jugadores hay conectados
-        // El Host cuenta como 1. Cuando entra el Cliente, serán 2.
-        int connectedPlayers = NetworkManager.Singleton.ConnectedClients.Count;
-
-        if (connectedPlayers >= 2)
+        // Doble chequeo por si el evento se dispara después
+        if (NetworkManager.Singleton.ConnectedClients.Count >= 2)
         {
             StartMatch();
         }
@@ -84,8 +86,8 @@ public class GameManager : NetworkBehaviour
         // Solo iniciamos si no ha empezado ya
         if (!isMatchActive.Value)
         {
-            Debug.Log("¡JUGADOR 2 CONECTADO! INICIANDO PARTIDA...");
-            isMatchActive.Value = true; // Esto activa el reloj para todos
+            Debug.Log("¡2 JUGADORES LISTOS! INICIANDO PARTIDA...");
+            isMatchActive.Value = true; // Esto activa el reloj y el Maná
         }
     }
 
@@ -93,10 +95,10 @@ public class GameManager : NetworkBehaviour
     {
         UpdateTimerUI();
 
-        // Lógica del Servidor
+        // Lógica del Servidor (Árbitro)
         if (IsServer)
         {
-            // SI NO HAY 2 JUGADORES, EL TIEMPO NO CORRE
+            // SI EL JUEGO NO HA EMPEZADO O YA TERMINÓ -> NO HACER NADA
             if (!isMatchActive.Value || isGameOver.Value) return;
 
             // 1. Restar Tiempo
@@ -114,7 +116,7 @@ public class GameManager : NetworkBehaviour
         }
     }
 
-    // --- (Resto de funciones de victoria IGUALES) ---
+    // --- LÓGICA DE VICTORIA ---
 
     private void CheckTimeOutWinner()
     {
@@ -135,6 +137,7 @@ public class GameManager : NetworkBehaviour
 
     private void CheckTieBreaker()
     {
+        // Desempate por vida de la torre central
         if (redKingTower.CurrentHealth.Value > blueKingTower.CurrentHealth.Value) EndGame("¡GANA EL ROJO!");
         else if (blueKingTower.CurrentHealth.Value > redKingTower.CurrentHealth.Value) EndGame("¡GANA EL AZUL!");
         else EndGame("¡EMPATE!");
@@ -165,17 +168,10 @@ public class GameManager : NetworkBehaviour
             int s = Mathf.FloorToInt(t % 60);
             timerText.text = string.Format("{0:00}:{1:00}", m, s);
 
-            // Feedback visual: Si la partida no ha empezado, mostramos texto de espera
-            if (!isMatchActive.Value && !isGameOver.Value)
-            {
-                // Opcional: Puedes cambiar el color a amarillo mientras espera
-                timerText.color = Color.yellow;
-            }
-            else
-            {
-                if (t < 10) timerText.color = Color.red;
-                else timerText.color = Color.white;
-            }
+            // Texto amarillo esperando, rojo acabándose, blanco normal
+            if (!isMatchActive.Value && !isGameOver.Value) timerText.color = Color.yellow;
+            else if (t < 10) timerText.color = Color.red;
+            else timerText.color = Color.white;
         }
     }
 }
