@@ -42,7 +42,8 @@ public class EntityVisual : MonoBehaviour
 
         if (healthBarContainer != null)
         {
-            bool shouldShow = currentHP < maxHP && currentHP > 0;
+            bool shouldShow = currentHP > 0; 
+        
             healthBarContainer.SetActive(shouldShow);
         }
     }

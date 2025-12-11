@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 039d92ecfba814f46b99860fff0afc8e, type: 3}
   m_Name: CartaPrueba 2
   m_EditorClassIdentifier: 
-  nombreCarta: Test1
-  icono: {fileID: 21300000, guid: c8f8fe1d78170e84eab15e7562604fdc, type: 3}
+  nombreCarta: Test2
+  icono: {fileID: 21300000, guid: 0dce6fe3618648e4f8c5fd9815a67c50, type: 3}
   descripcion: 
   costoMana: 4
   prefabUnidad: {fileID: 0}
+  unitId: 0

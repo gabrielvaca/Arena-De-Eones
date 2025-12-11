@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 039d92ecfba814f46b99860fff0afc8e, type: 3}
+  m_Name: RedDragon
+  m_EditorClassIdentifier: 
+  nombreCarta: Red Dragon
+  icono: {fileID: 21300000, guid: f2df0e1b163ec0a4fbed439f32c0e8c7, type: 3}
+  descripcion: 
+  costoMana: 5
+  prefabUnidad: {fileID: 139696, guid: eb58e8f2831a51f45a44a261e6710cdd, type: 3}
+  unitId: 3
