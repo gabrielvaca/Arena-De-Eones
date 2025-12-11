@@ -12,9 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 039d92ecfba814f46b99860fff0afc8e, type: 3}
   m_Name: DogKnight
   m_EditorClassIdentifier: 
-  nombreCarta: Test1
-  icono: {fileID: 21300000, guid: c8f8fe1d78170e84eab15e7562604fdc, type: 3}
+  nombreCarta: Dog Knight
+  icono: {fileID: 21300000, guid: c21e38d3597912b4f948551a6abc26cd, type: 3}
   descripcion: 
   costoMana: 1
   prefabUnidad: {fileID: 4836280685690848794, guid: 4230330b751b2b143895cfdbbef3e622, type: 3}
-  unitId: 0
+  unitId: 2
