@@ -5,26 +5,26 @@ using UnityEngine.UI;
 
 public class SplashScreenManager : MonoBehaviour
 {
-    [Header("Configuración de Carga")]
+    [Header("Configuraciï¿½n de Carga")]
     [SerializeField] private float minDisplayTime = 2.5f;
 
-    [Header("Configuración de Audio")]
+    [Header("Configuraciï¿½n de Audio")]
     [SerializeField] private AudioSource audioSource;
     [SerializeField] private AudioClip splashSound;
 
-    [Header("Configuración de Animación")]
+    [Header("Configuraciï¿½n de Animaciï¿½n")]
     [Tooltip("Objeto que se va a animar.")]
     [SerializeField] private RectTransform elementToZoom;
     [SerializeField] private float zoomDuration = 2.0f;
     [SerializeField] private float targetScale = 1.2f;
 
-    private const string MainMenuSceneName = "MenuPrincipal";
+    private const string MainMenuSceneName = "MainMenu";
 
     void Start()
     {
         if (elementToZoom == null)
         {
-            Debug.LogWarning("No se asignó 'elementToZoom'. Usando la Transformación de este objeto.");
+            Debug.LogWarning("No se asignï¿½ 'elementToZoom'. Usando la Transformaciï¿½n de este objeto.");
             elementToZoom = GetComponent<RectTransform>();
         }
 

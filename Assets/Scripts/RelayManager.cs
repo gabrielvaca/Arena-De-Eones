@@ -1,26 +1,24 @@
+using System;
 using UnityEngine;
-using Unity.Netcode;
-using System.Threading.Tasks;
 using Unity.Services.Core;
 using Unity.Services.Authentication;
 using Unity.Services.Relay;
 using Unity.Services.Relay.Models;
-using System; // Necesario para 'Action'
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEngine.SceneManagement;
 
 public class RelayManager : MonoBehaviour
 {
-    // Singleton para acceder desde cualquier lado
-    public static RelayManager Instance;
-
-    // Evento para avisar a la UI (LobbyUI) que ya terminamos de conectar
+    public static RelayManager Instance { get; private set; }
+    public string joinCodeMostrable;
     public event Action OnMatchmakingComplete;
 
-    // Variable para guardar el cÛdigo y mostrarlo en pantalla
-    public string joinCodeMostrable;
+    // Aseg√∫rate de que este nombre coincida EXACTAMENTE con tu archivo de escena
+    private const string SCENE_GAME = "Arena"; 
 
     private void Awake()
     {
-        // ConfiguraciÛn Singleton + DontDestroyOnLoad para sobrevivir al cambio de escena
         if (Instance == null)
         {
             Instance = this;
@@ -34,31 +32,29 @@ public class RelayManager : MonoBehaviour
 
     private async void Start()
     {
-        // Inicializamos los servicios de Unity (Relay/Lobby)
         await UnityServices.InitializeAsync();
-
-        // Nos logueamos como anÛnimos si no lo estamos ya
         if (!AuthenticationService.Instance.IsSignedIn)
         {
             await AuthenticationService.Instance.SignInAnonymouslyAsync();
         }
+
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+        }
     }
 
-    // --- L”GICA DEL HOST (CREAR PARTIDA) ---
+    // --- HOST ---
     public async void CreateRelay()
     {
         try
         {
-            // 1. Crear asignaciÛn para 2 jugadores (Host + 1 Invitado)
-            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(2);
-
-            // 2. Generar el cÛdigo de uniÛn
+            Allocation allocation = await RelayService.Instance.CreateAllocationAsync(1);
             string joinCode = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
             joinCodeMostrable = joinCode;
-            Debug.Log("CÛdigo generado: " + joinCode);
+            Debug.Log("C√≥digo generado: " + joinCode);
 
-            // 3. Configurar el transporte de red con los datos de Relay
-            NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>().SetHostRelayData(
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetHostRelayData(
                 allocation.RelayServer.IpV4,
                 (ushort)allocation.RelayServer.Port,
                 allocation.AllocationIdBytes,
@@ -66,55 +62,25 @@ public class RelayManager : MonoBehaviour
                 allocation.ConnectionData
             );
 
-            // 4. Iniciar el Host
+            // 1. Iniciamos el Host PERO NO CARGAMOS LA ESCENA A√öN
             NetworkManager.Singleton.StartHost();
-
-            // 5. Avisar a la UI (LobbyUI) para que oculte botones y muestre el cÛdigo
-            OnMatchmakingComplete?.Invoke();
-
-            // 6. °AQUÕ EST¡ LA CLAVE!
-            // No cargamos escena todavÌa. Activamos el "Vigilante" para esperar al cliente.
-            NetworkManager.Singleton.OnClientConnectedCallback += CheckPlayersToStart;
+            
+            // Aqu√≠ nos quedamos en el Men√∫ Principal esperando al jugador 2...
+            Debug.Log("Host iniciado. Esperando al Jugador 2...");
         }
         catch (RelayServiceException e)
         {
-            Debug.Log(e);
+            Debug.LogError("Error Relay: " + e);
         }
     }
 
-    // El "Vigilante": Se ejecuta autom·ticamente cada vez que alguien entra a la sala
-    private void CheckPlayersToStart(ulong clientId)
-    {
-        // Solo el servidor vigila esto
-        if (NetworkManager.Singleton.IsServer)
-        {
-            Debug.Log($"Jugador conectado. Total actual: {NetworkManager.Singleton.ConnectedClients.Count}");
-
-            // Si ya somos 2 jugadores (El Host + El Cliente que acaba de llegar)
-            if (NetworkManager.Singleton.ConnectedClients.Count == 2)
-            {
-                Debug.Log("°Sala llena! Iniciando viaje a la Arena...");
-
-                // Nos desuscribimos para que no siga vigilando (limpieza)
-                NetworkManager.Singleton.OnClientConnectedCallback -= CheckPlayersToStart;
-
-                // °V¡MONOS A LA ARENA!
-                // Carga la escena "Arena" y se lleva a todos los jugadores conectados
-                NetworkManager.Singleton.SceneManager.LoadScene("Arena", UnityEngine.SceneManagement.LoadSceneMode.Single);
-            }
-        }
-    }
-
-    // --- L”GICA DEL CLIENTE (UNIRSE) ---
+    // --- CLIENTE ---
     public async void JoinRelay(string joinCode)
     {
         try
         {
-            // 1. Unirse a la asignaciÛn con el cÛdigo
             JoinAllocation joinAllocation = await RelayService.Instance.JoinAllocationAsync(joinCode);
-
-            // 2. Configurar el transporte
-            NetworkManager.Singleton.GetComponent<Unity.Netcode.Transports.UTP.UnityTransport>().SetClientRelayData(
+            NetworkManager.Singleton.GetComponent<UnityTransport>().SetClientRelayData(
                 joinAllocation.RelayServer.IpV4,
                 (ushort)joinAllocation.RelayServer.Port,
                 joinAllocation.AllocationIdBytes,
@@ -123,17 +89,34 @@ public class RelayManager : MonoBehaviour
                 joinAllocation.HostConnectionData
             );
 
-            // 3. Iniciar como Cliente
             NetworkManager.Singleton.StartClient();
-
-            // 4. Avisar a la UI para ocultar el men˙
-            OnMatchmakingComplete?.Invoke();
-
-            // El cliente NO carga escena. Espera a que el Host (CheckPlayersToStart) lo haga.
         }
         catch (RelayServiceException e)
         {
-            Debug.Log("Error al unirse: " + e);
+            Debug.LogError("Error Join Relay: " + e);
+        }
+    }
+
+    private void OnClientConnected(ulong clientId)
+    {
+        // Esta funci√≥n se ejecuta en el Servidor cada vez que alguien se conecta
+        if (NetworkManager.Singleton.IsServer)
+        {
+            Debug.Log($"Jugador conectado: {clientId}");
+
+            // Verificamos si ya hay 2 jugadores (Host + Cliente)
+            if (NetworkManager.Singleton.ConnectedClients.Count == 2)
+            {
+                Debug.Log("¬°Jugador 2 conectado! Iniciando partida...");
+                // AHORA S√ç cargamos la escena para todos
+                NetworkManager.Singleton.SceneManager.LoadScene(SCENE_GAME, LoadSceneMode.Single);
+            }
+        }
+
+        // Evento para ocultar UI local (opcional)
+        if (clientId == NetworkManager.Singleton.LocalClientId)
+        {
+            OnMatchmakingComplete?.Invoke();
         }
     }
 }
